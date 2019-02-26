@@ -56,7 +56,7 @@ var LCHago;
         console.log("未监听onCustom", data, "对方发送的消息");
     };
     LCHago.onEnd = function (winnerID) {
-        console.log("未监听onEnd", "游戏结算", "获胜玩家ID", data);
+        console.log("未监听onEnd", "游戏结算", "获胜玩家ID", winnerID);
     };
     LCHago.onError = function (data) {
         console.log("未监听onError", "错误", data);
