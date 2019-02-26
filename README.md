@@ -112,6 +112,6 @@ LCHago.onJoin = function(data: any){};        // 等待对手加入
 LCHago.onCreate = function(data: any){};      // 双方都加入房间
 LCHago.onStart = function(){};                // 双方都准备完毕，可倒计时并开始游戏
 LCHago.onCustom = function(data: any){};      // 对方发送的消息
-LCHago.onEnd = function(data: any){};         // 游戏结算
+LCHago.onEnd = function(winnerID: any){};         // 游戏结算
 LCHago.onError = function(data: any){};       // 错误事件
 ```
