@@ -13,18 +13,19 @@ declare namespace LCHago {
     let onWSTimeout: () => void;
     let onWSClose: () => void;
     let onWSDisconnect: () => void;
-    let onJoin: (data: any) => void;
+    let onWSReconnect: () => void;
+    let onJoin: (myID: string) => void;
     let onCreate: (data: any) => void;
     let onStart: () => void;
     let onCustom: (data: any) => void;
-    let onEnd: (data: any) => void;
+    let onEnd: (winnerID: any) => void;
     let onError: (data: any) => void;
 }
 declare namespace LCHago {
     class WSServer {
         private ws;
         private joinID;
-        private isReconnect;
+        private isClose;
         private isSendReady;
         private isSendResult;
         private hasRecvResult;
@@ -32,6 +33,8 @@ declare namespace LCHago {
         private pingDuration;
         private timeoutInterval;
         private timeoutDuration;
+        private closeInterval;
+        private closeDuration;
         private sendIndex;
         private sendHistory;
         private recvIndex;
@@ -39,12 +42,14 @@ declare namespace LCHago {
         connect(): void;
         private onOpen();
         private onMessage(evt);
+        private resetDuration();
         private onClose();
         saveSend(bytes: any): void;
         recvMsg(index: number): void;
         ping(): void;
         pong(): void;
         send(msg: string): void;
+        disconnect(): void;
         close(): void;
         join(): void;
         sendReady(): void;
@@ -54,6 +59,7 @@ declare namespace LCHago {
 }
 declare namespace LCHago {
     function Connect(): void;
+    function Disconnect(): void;
     function Ready(): void;
     function Custom(data: string): void;
     function ResultNoStart(): void;

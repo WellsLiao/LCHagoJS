@@ -40,8 +40,11 @@ var LCHago;
     LCHago.onWSDisconnect = function () {
         console.log("未监听onWSDisconnect", "正在尝试重连");
     };
-    LCHago.onJoin = function (data) {
-        console.log("未监听onJoin", data, "等待对手加入");
+    LCHago.onWSReconnect = function () {
+        console.log("未监听onWSReconnect", "重连成功");
+    };
+    LCHago.onJoin = function (myID) {
+        console.log("未监听onJoin", "myID=" + myID, "等待对手加入");
     };
     LCHago.onCreate = function (data) {
         console.log("未监听onCreate", data);
@@ -52,7 +55,7 @@ var LCHago;
     LCHago.onCustom = function (data) {
         console.log("未监听onCustom", data, "对方发送的消息");
     };
-    LCHago.onEnd = function (data) {
+    LCHago.onEnd = function (winnerID) {
         console.log("未监听onEnd", "游戏结算", "获胜玩家ID", data);
     };
     LCHago.onError = function (data) {
@@ -69,12 +72,13 @@ var LCHago;
     var pongBytes = gameProto.Msg.encode(msgPing).finish();
     var WSServer = (function () {
         function WSServer() {
-            this.isReconnect = false;
+            this.isClose = false;
             this.isSendReady = false;
             this.isSendResult = false;
             this.hasRecvResult = false;
             this.pingDuration = 0;
             this.timeoutDuration = 0;
+            this.closeDuration = 0;
             this.sendIndex = 0;
             this.sendHistory = [];
             this.recvIndex = 0;
@@ -90,8 +94,7 @@ var LCHago;
         };
         WSServer.prototype.onOpen = function () {
             var self = this;
-            self.pingDuration = 0;
-            self.timeoutDuration = 0;
+            self.resetDuration();
             if (self.pingInterval == null) {
                 self.pingInterval = setInterval(function () {
                     self.pingDuration += 0.5;
@@ -105,14 +108,27 @@ var LCHago;
                 self.timeoutInterval = setInterval(function () {
                     self.timeoutDuration += 0.5;
                     if (self.timeoutDuration >= LCHago.Config.timeoutSpace) {
+                        console.log("disconnect");
+                        self.disconnect();
+                    }
+                }, 500);
+            }
+            if (self.closeInterval == null) {
+                self.closeInterval = setInterval(function () {
+                    self.closeDuration += 1;
+                    if (self.closeDuration >= LCHago.Config.closeSpace) {
                         console.log("timeout");
                         self.close();
                     }
-                }, 500);
+                }, 1000);
             }
             self.ws.binaryType = 'arraybuffer';
             if (this.joinID == null) {
                 this.join();
+                LCHago.onWSConnect();
+            }
+            else {
+                LCHago.onWSReconnect();
             }
         };
         WSServer.prototype.onMessage = function (evt) {
@@ -125,8 +141,8 @@ var LCHago;
                         break;
                     case gameProto.MsgID.JoinResp:
                         var msgJoinResp = gameProto.MsgJoinResp.decode(uint8array);
-                        console.log("recv JoinResp", msgJoinResp);
                         this.joinID = msgJoinResp.joinID;
+                        LCHago.onJoin(msgJoinResp.joinID);
                         break;
                     case gameProto.MsgID.Create:
                         var msgCreate = gameProto.MsgCreate.decode(uint8array);
@@ -157,12 +173,16 @@ var LCHago;
             catch (error) {
                 console.log(error);
             }
+            this.resetDuration();
+        };
+        WSServer.prototype.resetDuration = function () {
             this.pingDuration = 0;
             this.timeoutDuration = 0;
+            this.closeDuration = 0;
         };
         WSServer.prototype.onClose = function () {
             this.ws = null;
-            this.close();
+            this.disconnect();
         };
         WSServer.prototype.saveSend = function (bytes) {
             this.sendIndex += 1;
@@ -188,7 +208,25 @@ var LCHago;
                 this.ws.send(msg);
             }
         };
+        WSServer.prototype.disconnect = function () {
+            var _this = this;
+            if (this.ws) {
+                this.ws.close();
+            }
+            else {
+                LCHago.onWSDisconnect();
+                if (this.isClose == false) {
+                    setTimeout(function () {
+                        _this.connect();
+                    }, 1000);
+                }
+            }
+        };
         WSServer.prototype.close = function () {
+            if (this.isClose) {
+                return;
+            }
+            this.isClose = true;
             if (this.ws) {
                 this.ws.close();
             }
@@ -199,6 +237,10 @@ var LCHago;
             if (this.timeoutInterval) {
                 clearInterval(this.timeoutInterval);
                 this.timeoutInterval = null;
+            }
+            if (this.closeInterval) {
+                clearInterval(this.closeInterval);
+                this.closeInterval = null;
             }
             if (this.hasRecvResult) {
                 LCHago.onWSClose();
@@ -215,7 +257,6 @@ var LCHago;
             });
             var msgBytes = gameProto.MsgJoin.encode(msg).finish();
             this.send(msgBytes);
-            console.log("send Join", msg);
         };
         WSServer.prototype.sendReady = function () {
             if (!this.isSendReady) {
@@ -264,6 +305,10 @@ var LCHago;
         wsServer.connect();
     }
     LCHago.Connect = Connect;
+    function Disconnect() {
+        wsServer.disconnect();
+    }
+    LCHago.Disconnect = Disconnect;
     function Ready() {
         wsServer.sendReady();
     }
