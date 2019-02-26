@@ -20,7 +20,7 @@ Demo 截图如下：
 
 ## 2. 接口说明
 
-**对接须引入 `lchagopb.min.js` 、 `LCHago.d.ts` 文件。**
+**对接须引入 `lchagopb.min.js` 、 `LCHago.js` 、 `LCHago.d.ts` 文件。**
 
 ### 2.1. 创建连接
 
