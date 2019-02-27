@@ -4,8 +4,18 @@ declare namespace LCHago {
         pingSpace: number;
         timeoutSpace: number;
         closeSpace: number;
-        userData: gameProto.UserData;
-        roomData: gameProto.RoomData;
+        userData: {
+            uid: string;
+            name: string;
+            avatar: string;
+            opt: string;
+        };
+        roomData: {
+            roomID: string;
+            gameID: string;
+            channelID: string;
+            kv: string;
+        };
     };
 }
 declare namespace LCHago {
