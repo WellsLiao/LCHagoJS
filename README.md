@@ -41,8 +41,65 @@ Demo 截图如下：
 LCHago.Config.wsUrl = 'xxx';
 LCHago.Config.userData.uid = 'xxx';
 LCHago.Config.roomData.roomID = 'xxx';
+
+// 机器人测试请添加如下代码，真人匹配时请注释
+LCHago.Config.userData.opt = JSON.stringify({
+    ai_info: {
+        uid: "robotuid",
+        nick: "robotnick"
+    }
+})
 // 创建连接
 LCHago.Connect();
+```
+当双方玩家都加入房间时会收到`LCHago.OnCreate(data)` 回调,
+```javascript
+//真人匹配 内容示例
+{
+    "ID": "Create",
+    "seed": 1427131847,
+    "playerArray": [
+        {
+            "id": "testUser2",
+            "user": {
+                "uid": "testUser2",
+                "name": "name"
+            }
+        },
+        {
+            "id": "robotuid",
+            "user": {
+                "uid": "robotuid",
+                "name": "robotnick",
+                "opt": ""
+            }
+        }
+    ],
+    "timestamp": 1551775552
+}
+//匹配AI 内容示例 区别就在于opt字段
+{
+    "ID": "Create",
+    "seed": 1427131847,
+    "playerArray": [
+        {
+            "id": "testUser2",
+            "user": {
+                "uid": "testUser2",
+                "name": "name"
+            }
+        },
+        {
+            "id": "robotuid",
+            "user": {
+                "uid": "robotuid",
+                "name": "robotnick",
+                "opt": "{\"isAI\":true}"
+            }
+        }
+    ],
+    "timestamp": 1551775552
+}
 ```
 
 ### 2.2. Ready
@@ -112,6 +169,9 @@ LCHago.onJoin = function(data: any){};        // 等待对手加入
 LCHago.onCreate = function(data: any){};      // 双方都加入房间
 LCHago.onStart = function(){};                // 双方都准备完毕，可倒计时并开始游戏
 LCHago.onCustom = function(data: any){};      // 对方发送的消息
-LCHago.onEnd = function(winnerID: any){};     // 游戏结算
+LCHago.onNoStart = function(){};     // 游戏等待超时，已未开始结算
+LCHago.onEndWin = function(){}; // 游戏结算 你获胜
+LCHago.onEndLose = function(){}; // 游戏结算 你失败
+LCHago.onEndDraw = function(){}; // 游戏结算 平局
 LCHago.onError = function(data: any){};       // 错误事件
 ```

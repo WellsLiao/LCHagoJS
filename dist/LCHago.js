@@ -9,21 +9,22 @@ var LCHago;
     };
     LCHago.Config = {
         wsUrl: "ws://127.0.0.1:8888",
-        pingSpace: 2,
-        timeoutSpace: 5,
-        closeSpace: 10,
-        userData: new gameProto.UserData({
+        pingSpace: 1,
+        waitStartSpace: 15,
+        timeoutSpace: 3,
+        closeSpace: 6,
+        userData: {
             uid: "uid",
             name: "name",
             avatar: "",
             opt: "",
-        }),
-        roomData: new gameProto.RoomData({
+        },
+        roomData: {
             roomID: "1",
             gameID: "gameID",
             channelID: "channelID",
             kv: "",
-        })
+        }
     };
 })(LCHago || (LCHago = {}));
 var LCHago;
@@ -32,7 +33,7 @@ var LCHago;
         console.log("未监听onWSConnect", "正在加入房间");
     };
     LCHago.onWSTimeout = function () {
-        console.log("未监听onWSClose", "连接关闭，重连超时，游戏已失败结算");
+        console.log("未监听onWSClose", "连接关闭，游戏结算");
     };
     LCHago.onWSClose = function () {
         console.log("未监听onWSClose", "连接关闭，游戏结束");
@@ -43,20 +44,30 @@ var LCHago;
     LCHago.onWSReconnect = function () {
         console.log("未监听onWSReconnect", "重连成功");
     };
-    LCHago.onJoin = function (myID) {
-        console.log("未监听onJoin", "myID=" + myID, "等待对手加入");
+    LCHago.onJoin = function () {
+        console.log("未监听onJoin", "等待对手加入");
     };
     LCHago.onCreate = function (data) {
         console.log("未监听onCreate", data);
+        console.log(JSON.stringify(data));
     };
-    LCHago.onStart = function () {
-        console.log("未监听onStart", "双方都完毕，可倒计时并开始游戏");
+    LCHago.onStart = function (data) {
+        console.log("未监听onStart", data, "双方都完毕，可倒计时并开始游戏");
     };
     LCHago.onCustom = function (data) {
         console.log("未监听onCustom", data, "对方发送的消息");
     };
-    LCHago.onEnd = function (winnerID) {
-        console.log("未监听onEnd", "游戏结算", "获胜玩家ID", winnerID);
+    LCHago.onNoStart = function () {
+        console.log("未监听onNoStart", "游戏等待超时，以未开始结算");
+    };
+    LCHago.onEndWin = function () {
+        console.log("未监听onEndWin", "游戏结算 我方胜利");
+    };
+    LCHago.onEndLose = function () {
+        console.log("未监听onEndLose", "游戏结算 我方失败");
+    };
+    LCHago.onEndDraw = function () {
+        console.log("未监听onEndDraw", "游戏结算 平局");
     };
     LCHago.onError = function (data) {
         console.log("未监听onError", "错误", data);
@@ -84,8 +95,21 @@ var LCHago;
             this.recvIndex = 0;
         }
         WSServer.prototype.connect = function () {
-            if (this.ws) {
+            if (this.ws || this.isClose) {
                 return;
+            }
+            this.isClose = false;
+            console.log("正在连接服务器", LCHago.Config.wsUrl);
+            var self = this;
+            if (self.closeInterval == null) {
+                self.closeInterval = setInterval(function () {
+                    self.closeDuration += 1;
+                    if (self.closeDuration >= LCHago.Config.closeSpace) {
+                        console.log("timeout");
+                        self.closeDuration -= LCHago.Config.closeSpace;
+                        self.close();
+                    }
+                }, 1000);
             }
             var ws = this.ws = new WebSocket(LCHago.Config.wsUrl);
             ws.onopen = this.onOpen.bind(this);
@@ -109,26 +133,19 @@ var LCHago;
                     self.timeoutDuration += 0.5;
                     if (self.timeoutDuration >= LCHago.Config.timeoutSpace) {
                         console.log("disconnect");
+                        self.timeoutDuration -= LCHago.Config.timeoutSpace;
                         self.disconnect();
                     }
                 }, 500);
             }
-            if (self.closeInterval == null) {
-                self.closeInterval = setInterval(function () {
-                    self.closeDuration += 1;
-                    if (self.closeDuration >= LCHago.Config.closeSpace) {
-                        console.log("timeout");
-                        self.close();
-                    }
-                }, 1000);
-            }
             self.ws.binaryType = 'arraybuffer';
             if (this.joinID == null) {
-                this.join();
                 LCHago.onWSConnect();
+                this.join();
             }
             else {
                 LCHago.onWSReconnect();
+                this.rejoin();
             }
         };
         WSServer.prototype.onMessage = function (evt) {
@@ -142,7 +159,7 @@ var LCHago;
                     case gameProto.MsgID.JoinResp:
                         var msgJoinResp = gameProto.MsgJoinResp.decode(uint8array);
                         this.joinID = msgJoinResp.joinID;
-                        LCHago.onJoin(msgJoinResp.joinID);
+                        LCHago.onJoin();
                         break;
                     case gameProto.MsgID.Create:
                         var msgCreate = gameProto.MsgCreate.decode(uint8array);
@@ -152,7 +169,7 @@ var LCHago;
                     case gameProto.MsgID.Start:
                         var msgStart = gameProto.MsgStart.decode(uint8array);
                         this.recvMsg(msgStart.index);
-                        LCHago.onStart();
+                        LCHago.onStart(msgStart);
                         break;
                     case gameProto.MsgID.Custom:
                         var msgCustom = gameProto.MsgCustom.decode(uint8array);
@@ -162,10 +179,27 @@ var LCHago;
                     case gameProto.MsgID.Error:
                         var msgError = gameProto.MsgError.decode(uint8array);
                         LCHago.onError(msgError.msg);
+                        this.close();
+                        break;
+                    case gameProto.MsgID.SendError:
+                        var msgSendError = gameProto.MsgSendError.decode(uint8array);
+                        this.onSendError(msgSendError.from);
+                        console.log("msgSendError", msgSendError);
                         break;
                     case gameProto.MsgID.End:
                         var msgEnd = gameProto.MsgEnd.decode(uint8array);
-                        LCHago.onEnd(msgEnd.winnerPlayerID);
+                        if (msgEnd.type == 0) {
+                            LCHago.onNoStart();
+                        }
+                        if (msgEnd.type == 1) {
+                            LCHago.onEndWin();
+                        }
+                        else if (msgEnd.type == 2) {
+                            LCHago.onEndLose();
+                        }
+                        else {
+                            LCHago.onEndDraw();
+                        }
                         this.hasRecvResult = true;
                         break;
                 }
@@ -214,10 +248,12 @@ var LCHago;
                 this.ws.close();
             }
             else {
-                LCHago.onWSDisconnect();
                 if (this.isClose == false) {
+                    LCHago.onWSDisconnect();
                     setTimeout(function () {
-                        _this.connect();
+                        if (_this.isClose == false) {
+                            _this.connect();
+                        }
                     }, 1000);
                 }
             }
@@ -258,6 +294,14 @@ var LCHago;
             var msgBytes = gameProto.MsgJoin.encode(msg).finish();
             this.send(msgBytes);
         };
+        WSServer.prototype.rejoin = function () {
+            var msg = new gameProto.MsgRejoin({
+                ID: gameProto.MsgID.Rejoin,
+                joinID: this.joinID,
+            });
+            var msgBytes = gameProto.MsgRejoin.encode(msg).finish();
+            this.send(msgBytes);
+        };
         WSServer.prototype.sendReady = function () {
             if (!this.isSendReady) {
                 this.isSendReady = true;
@@ -292,6 +336,11 @@ var LCHago;
                 var msgBytes = gameProto.MsgResult.encode(msg).finish();
                 this.saveSend(msgBytes);
                 this.send(msgBytes);
+            }
+        };
+        WSServer.prototype.onSendError = function (from) {
+            for (var i = from, len = this.sendIndex; i < len; ++i) {
+                this.send(this.sendHistory[i]);
             }
         };
         return WSServer;

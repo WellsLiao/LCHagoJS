@@ -2,6 +2,7 @@ declare namespace LCHago {
     let Config: {
         wsUrl: string;
         pingSpace: number;
+        waitStartSpace: number;
         timeoutSpace: number;
         closeSpace: number;
         userData: {
@@ -19,16 +20,37 @@ declare namespace LCHago {
     };
 }
 declare namespace LCHago {
+    interface IUserData {
+        uid?: (string | null);
+        name?: (string | null);
+        avatar?: (string | null);
+        opt?: (string | null);
+    }
+    interface IPlayer {
+        id?: (string | null);
+        user?: (IUserData | null);
+    }
+    interface IMsgCreate {
+        seed?: (number | null);
+        playerArray?: (IPlayer[] | null);
+        timestamp?: (number | null);
+    }
+    interface IMsgStart {
+        timestamp?: (number | null);
+    }
     let onWSConnect: () => void;
     let onWSTimeout: () => void;
     let onWSClose: () => void;
     let onWSDisconnect: () => void;
     let onWSReconnect: () => void;
-    let onJoin: (myID: string) => void;
-    let onCreate: (data: any) => void;
-    let onStart: () => void;
-    let onCustom: (data: any) => void;
-    let onEnd: (winnerID: any) => void;
+    let onJoin: () => void;
+    let onCreate: (data: IMsgCreate) => void;
+    let onStart: (data: IMsgStart) => void;
+    let onCustom: (data: string) => void;
+    let onNoStart: () => void;
+    let onEndWin: () => void;
+    let onEndLose: () => void;
+    let onEndDraw: () => void;
     let onError: (data: any) => void;
 }
 declare namespace LCHago {
@@ -58,13 +80,15 @@ declare namespace LCHago {
         recvMsg(index: number): void;
         ping(): void;
         pong(): void;
-        send(msg: string): void;
+        send(msg: string | Uint8Array): void;
         disconnect(): void;
         close(): void;
         join(): void;
+        rejoin(): void;
         sendReady(): void;
         sendCustom(data: any): void;
         sendResult(type: number): void;
+        onSendError(from: number): void;
     }
 }
 declare namespace LCHago {
