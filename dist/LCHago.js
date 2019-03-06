@@ -146,6 +146,7 @@ var LCHago;
             else {
                 LCHago.onWSReconnect();
                 this.rejoin();
+                this.recvErr();
             }
         };
         WSServer.prototype.onMessage = function (evt) {
@@ -300,6 +301,14 @@ var LCHago;
                 joinID: this.joinID,
             });
             var msgBytes = gameProto.MsgRejoin.encode(msg).finish();
+            this.send(msgBytes);
+        };
+        WSServer.prototype.recvErr = function () {
+            var msg = new gameProto.MsgRecvError({
+                ID: gameProto.MsgID.RecvError,
+                from: this.recvIndex,
+            });
+            var msgBytes = gameProto.MsgRecvError.encode(msg).finish();
             this.send(msgBytes);
         };
         WSServer.prototype.sendReady = function () {

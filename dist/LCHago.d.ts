@@ -85,6 +85,7 @@ declare namespace LCHago {
         close(): void;
         join(): void;
         rejoin(): void;
+        recvErr(): void;
         sendReady(): void;
         sendCustom(data: any): void;
         sendResult(type: number): void;
