@@ -160,18 +160,18 @@ LCHago.ResultDraw();  // 平局
 2. 接口示例
 
 ```javascript
-LCHago.onWSConnect = function(){};            // 正在加入房间
-LCHago.onWSTimeout = function(){};            // 连接关闭，重连超时，游戏已失败结算
-LCHago.onWSClose = function(){};              // 连接关闭，游戏结束
-LCHago.onWSDisconnect = function(){};         // 正在尝试重连
-LCHago.onWSReconnect = function(){};          // 重连成功
-LCHago.onJoin = function(data: any){};        // 等待对手加入
+LCHago.onWSConnect = function(){};            // 正在加入房间 前端表现：半透明黑色背景，然后中间文字提示 正在加入房间...
+LCHago.onWSTimeout = function(){};            // 连接关闭，重连超时，游戏已失败结算 前端表现：弹出失败窗口 
+LCHago.onWSClose = function(){};              // 连接关闭，游戏结束  前端表现：弹出失败窗口
+LCHago.onWSDisconnect = function(){};         // 正在尝试重连  前端表现：小提示框，然后中间文字提示 正在尝试重连...
+LCHago.onWSReconnect = function(){};          // 重连成功   前端表现：去除 正在尝试重连 的提示框
+LCHago.onJoin = function(data: any){};        // 等待对手加入 前端表现：半透明黑色背景，然后中间文字提示 等待对手加入...
 LCHago.onCreate = function(data: any){};      // 双方都加入房间
 LCHago.onStart = function(){};                // 双方都准备完毕，可倒计时并开始游戏
 LCHago.onCustom = function(data: any){};      // 对方发送的消息
 LCHago.onNoStart = function(){};     // 游戏等待超时，已未开始结算
-LCHago.onEndWin = function(){}; // 游戏结算 你获胜
-LCHago.onEndLose = function(){}; // 游戏结算 你失败
-LCHago.onEndDraw = function(){}; // 游戏结算 平局
+LCHago.onEndWin = function(){}; // 游戏结算 你获胜 前端表现：弹出胜利窗口
+LCHago.onEndLose = function(){}; // 游戏结算 你失败 前端表现：弹出失败窗口
+LCHago.onEndDraw = function(){}; // 游戏结算 平局 前端表现：弹出平局窗口
 LCHago.onError = function(data: any){};       // 错误事件
 ```
