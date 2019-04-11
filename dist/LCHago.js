@@ -72,6 +72,20 @@ var LCHago;
     LCHago.onError = function (data) {
         console.log("未监听onError", "错误", data);
     };
+    LCHago.onEnterBackground = function () {
+        console.log("未监听onEnterBackground");
+    };
+    LCHago.onEnterForeground = function () {
+        console.log("未监听onEnterForeground");
+    };
+    document.addEventListener("visibilitychange", function (event) {
+        if (document.hidden == true) {
+            LCHago.onEnterBackground();
+        }
+        else {
+            LCHago.onEnterForeground();
+        }
+    });
 })(LCHago || (LCHago = {}));
 var LCHago;
 (function (LCHago) {
@@ -391,5 +405,9 @@ var LCHago;
         wsServer.sendResult(3);
     }
     LCHago.ResultDraw = ResultDraw;
+    function GetLanguage() {
+        return "en-us";
+    }
+    LCHago.GetLanguage = GetLanguage;
 })(LCHago || (LCHago = {}));
 //# sourceMappingURL=LCHago.js.map

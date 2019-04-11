@@ -52,6 +52,8 @@ declare namespace LCHago {
     let onEndLose: () => void;
     let onEndDraw: () => void;
     let onError: (data: any) => void;
+    let onEnterBackground: () => void;
+    let onEnterForeground: () => void;
 }
 declare namespace LCHago {
     class WSServer {
@@ -101,4 +103,5 @@ declare namespace LCHago {
     function ResultWin(): void;
     function ResultLose(): void;
     function ResultDraw(): void;
+    function GetLanguage(): string;
 }
