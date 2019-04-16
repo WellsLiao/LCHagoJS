@@ -9,10 +9,10 @@ var LCHago;
     };
     LCHago.Config = {
         wsUrl: "ws://127.0.0.1:8888",
-        pingSpace: 1,
+        pingSpace: 4,
         waitStartSpace: 15,
-        timeoutSpace: 3,
-        closeSpace: 6,
+        timeoutSpace: 8,
+        closeSpace: 15,
         userData: {
             uid: "uid",
             name: "name",
@@ -78,12 +78,20 @@ var LCHago;
     LCHago.onEnterForeground = function () {
         console.log("未监听onEnterForeground");
     };
+    var backgroundDuration = 0;
+    setInterval(function () {
+        backgroundDuration += 1;
+        if (backgroundDuration > 15) {
+            LCHago.ResultLose();
+        }
+    }, 1000);
     document.addEventListener("visibilitychange", function (event) {
         if (document.hidden == true) {
             LCHago.onEnterBackground();
         }
         else {
             LCHago.onEnterForeground();
+            backgroundDuration = 0;
         }
     });
 })(LCHago || (LCHago = {}));
@@ -95,6 +103,13 @@ var LCHago;
     var msgPong = new gameProto.Msg();
     msgPong.ID = gameProto.MsgID.Pong;
     var pongBytes = gameProto.Msg.encode(msgPing).finish();
+    setTimeout(function () {
+        if (isCreate == false) {
+            LCHago.ResultNoStart();
+        }
+    }, 10000);
+    var isCreate = false;
+    var isSurrender = false;
     var WSServer = (function () {
         function WSServer() {
             this.isClose = false;
@@ -405,9 +420,11 @@ var LCHago;
         wsServer.sendResult(3);
     }
     LCHago.ResultDraw = ResultDraw;
-    function GetLanguage() {
-        return "en-us";
+    function GetLanguageAsync(cb) {
+        setTimeout(function () {
+            cb("en");
+        }, 100);
     }
-    LCHago.GetLanguage = GetLanguage;
+    LCHago.GetLanguageAsync = GetLanguageAsync;
 })(LCHago || (LCHago = {}));
 //# sourceMappingURL=LCHago.js.map

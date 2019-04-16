@@ -149,7 +149,9 @@ LCHago.Custom(data);
 LCHago.ResultWin();   // 胜利
 LCHago.ResultLose();  // 失败
 LCHago.ResultDraw();  // 平局
-LCHago.GetLanguage();  // 返回获取当前语言环境 en-us 英文 id 印尼 in 印度
+LCHago.GetLanguageAsync(function(lang){
+    //lang返回获取当前语言环境 en-us 英文 id 印尼 in 印度
+}); 
 ```
 
 ### 2.5. 生命周期和监听事件

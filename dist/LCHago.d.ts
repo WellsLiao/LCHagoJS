@@ -103,5 +103,5 @@ declare namespace LCHago {
     function ResultWin(): void;
     function ResultLose(): void;
     function ResultDraw(): void;
-    function GetLanguage(): string;
+    function GetLanguageAsync(cb: (lang: string) => void): void;
 }
