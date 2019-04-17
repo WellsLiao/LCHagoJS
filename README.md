@@ -149,9 +149,11 @@ LCHago.Custom(data);
 LCHago.ResultWin();   // 胜利
 LCHago.ResultLose();  // 失败
 LCHago.ResultDraw();  // 平局
-LCHago.GetLanguageAsync(function(lang){
-    //lang返回获取当前语言环境 en-us 英文 id 印尼 in 印度
-}); 
+LCHago.GetDeviceInfo(function (deviceInfo){
+    //deviceInfo.safeAreaInser 安全显示区域距离边缘的距离 deviceInfo.safeAreaInser.top deviceInfo.safeAreaInser.bottom deviceInfo.safeAreaInser.right deviceInfo.safeAreaInser.left
+    //deviceInfo.lang 当前语言环境 en-us 英文 id 印尼 in 印度
+    //deviceInfo.screenSize 屏幕尺寸deviceInfo.screenSize.width deviceInfo.screenSize.height
+}) => void): void;
 ```
 
 ### 2.5. 生命周期和监听事件

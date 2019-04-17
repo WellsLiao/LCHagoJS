@@ -420,11 +420,18 @@ var LCHago;
         wsServer.sendResult(3);
     }
     LCHago.ResultDraw = ResultDraw;
-    function GetLanguageAsync(cb) {
+    function GetDeviceInfo(cb) {
         setTimeout(function () {
-            cb("en");
+            cb({
+                safeAreaInser: { top: 0, left: 0, bottom: 0, right: 0 },
+                lang: "en",
+                screenSize: {
+                    width: document.body.clientWidth,
+                    height: document.body.clientHeight,
+                }
+            });
         }, 100);
     }
-    LCHago.GetLanguageAsync = GetLanguageAsync;
+    LCHago.GetDeviceInfo = GetDeviceInfo;
 })(LCHago || (LCHago = {}));
 //# sourceMappingURL=LCHago.js.map

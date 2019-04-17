@@ -103,5 +103,17 @@ declare namespace LCHago {
     function ResultWin(): void;
     function ResultLose(): void;
     function ResultDraw(): void;
-    function GetLanguageAsync(cb: (lang: string) => void): void;
+    function GetDeviceInfo(cb: (deviceInfo: {
+        safeAreaInser: {
+            top: number;
+            left: number;
+            bottom: number;
+            right: number;
+        };
+        lang: string;
+        screenSize: {
+            width: number;
+            height: number;
+        };
+    }) => void): void;
 }
