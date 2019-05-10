@@ -378,7 +378,7 @@ var LCHago;
 var LCHago;
 (function (LCHago) {
     LCHago.testRobot = false;
-    var url = "ws://127.0.0.1:8888";
+    var url = "ws://www.duligame.cn:8890";
     var userData = {
         uid: "uid",
         name: "name",
