@@ -1,23 +1,5 @@
 declare namespace LCHago {
-    let Config: {
-        wsUrl: string;
-        pingSpace: number;
-        waitStartSpace: number;
-        timeoutSpace: number;
-        closeSpace: number;
-        userData: {
-            uid: string;
-            name: string;
-            avatar: string;
-            opt: string;
-        };
-        roomData: {
-            roomID: string;
-            gameID: string;
-            channelID: string;
-            kv: string;
-        };
-    };
+    let isHago: boolean;
 }
 declare namespace LCHago {
     interface IUserData {
@@ -38,10 +20,7 @@ declare namespace LCHago {
     interface IMsgStart {
         timestamp?: (number | null);
     }
-    let onWSConnect: () => void;
-    let onWSTimeout: () => void;
-    let onWSClose: () => void;
-    let onWSDisconnect: () => void;
+    let onWSOpen: () => void;
     let onWSReconnect: () => void;
     let onJoin: () => void;
     let onCreate: (data: IMsgCreate) => void;
@@ -54,38 +33,51 @@ declare namespace LCHago {
     let onError: (data: any) => void;
     let onEnterBackground: () => void;
     let onEnterForeground: () => void;
+    let isEnterBackground: boolean;
 }
 declare namespace LCHago {
-    class WSServer {
-        private ws;
-        private joinID;
-        private isClose;
-        private isSendReady;
-        private isSendResult;
-        private hasRecvResult;
-        private pingInterval;
-        private pingDuration;
-        private timeoutInterval;
-        private timeoutDuration;
-        private closeInterval;
-        private closeDuration;
+    enum WebsocketClientStatus {
+        CLOSED = 0,
+        CLOSING = 1,
+        CONNECTING = 2,
+        OPEN = 3,
+    }
+    class WebsocketClient {
+        private conn;
+        private url;
+        private status;
         private sendIndex;
         private sendHistory;
         private recvIndex;
+        private pingInterval;
+        private timeoutInterval;
+        private closeInterval;
+        private pingDuration;
+        private timeoutDuration;
+        private closeDuration;
+        private intervalNumber;
+        joinID: string;
+        isEnd: boolean;
+        isSendReady: boolean;
+        isSendResult: boolean;
+        isCreate: boolean;
+        isSurrender: boolean;
+        isStart: boolean;
+        onOpen: () => void;
+        onReconnect: () => void;
+        onClose: () => void;
         constructor();
-        connect(): void;
-        private onOpen();
-        private onMessage(evt);
+        connect(url: string): void;
+        private startInterval();
+        reconnect(): void;
         private resetDuration();
-        private onClose();
         saveSend(bytes: any): void;
         recvMsg(index: number): void;
         ping(): void;
         pong(): void;
-        send(msg: string | Uint8Array): void;
-        disconnect(): void;
+        send(msg: string | Uint8Array): boolean;
         close(): void;
-        join(): void;
+        join(userData: any, roomData: any): void;
         rejoin(): void;
         recvErr(): void;
         sendReady(): void;
@@ -95,8 +87,10 @@ declare namespace LCHago {
     }
 }
 declare namespace LCHago {
+    let testRobot: boolean;
     function Connect(): void;
-    function Disconnect(): void;
+    function reconnect(): void;
+    function Close(): void;
     function Ready(): void;
     function Custom(data: string): void;
     function ResultNoStart(): void;

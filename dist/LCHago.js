@@ -1,48 +1,22 @@
 var LCHago;
 (function (LCHago) {
-    var getQueryString = function (name) {
-        var reg = new RegExp("(^|&)" + name + "=([^&]*)(&|$)", "i");
-        var r = window.location.search.substr(1).match(reg);
-        if (r != null)
-            return decodeURIComponent(r[2]);
-        return null;
-    };
-    LCHago.Config = {
-        wsUrl: "ws://127.0.0.1:8888",
-        pingSpace: 4,
-        waitStartSpace: 15,
-        timeoutSpace: 8,
-        closeSpace: 15,
-        userData: {
-            uid: "uid",
-            name: "name",
-            avatar: "",
-            opt: "",
-        },
-        roomData: {
-            roomID: "1",
-            gameID: "gameID",
-            channelID: "channelID",
-            kv: "",
+    LCHago.isHago = false;
+    try {
+        if (hago != null) {
+            LCHago.isHago = true;
         }
-    };
+    }
+    catch (error) {
+    }
+    console.log("isHago", LCHago.isHago);
 })(LCHago || (LCHago = {}));
 var LCHago;
 (function (LCHago) {
-    LCHago.onWSConnect = function () {
-        console.log("未监听onWSConnect", "正在加入房间");
-    };
-    LCHago.onWSTimeout = function () {
-        console.log("未监听onWSClose", "连接关闭，游戏结算");
-    };
-    LCHago.onWSClose = function () {
-        console.log("未监听onWSClose", "连接关闭，游戏结束");
-    };
-    LCHago.onWSDisconnect = function () {
-        console.log("未监听onWSDisconnect", "正在尝试重连");
+    LCHago.onWSOpen = function () {
+        console.log("未监听onWSOpen", "网络连接正常");
     };
     LCHago.onWSReconnect = function () {
-        console.log("未监听onWSReconnect", "重连成功");
+        console.log("未监听onWSReconnect", "正在尝试重连");
     };
     LCHago.onJoin = function () {
         console.log("未监听onJoin", "等待对手加入");
@@ -78,22 +52,33 @@ var LCHago;
     LCHago.onEnterForeground = function () {
         console.log("未监听onEnterForeground");
     };
+    LCHago.isEnterBackground = false;
     var backgroundDuration = 0;
     setInterval(function () {
-        backgroundDuration += 1;
-        if (backgroundDuration > 15) {
-            LCHago.ResultLose();
+        if (LCHago.isEnterBackground) {
+            backgroundDuration += 1;
+            if (backgroundDuration > 15) {
+                LCHago.ResultLose();
+            }
         }
     }, 1000);
-    document.addEventListener("visibilitychange", function (event) {
-        if (document.hidden == true) {
-            LCHago.onEnterBackground();
-        }
-        else {
-            LCHago.onEnterForeground();
+    if (LCHago.isHago) {
+        hago.setEnterBackgroundCallback(function () {
+            console.error("setEnterBackgroundCallback");
+            if (LCHago.onEnterBackground) {
+                LCHago.onEnterBackground();
+            }
+            LCHago.isEnterBackground = true;
+        });
+        hago.setEnterForegroundCallback(function () {
+            console.error("setEnterForegroundCallback");
+            if (LCHago.onEnterForeground) {
+                LCHago.onEnterForeground();
+            }
+            LCHago.isEnterBackground = false;
             backgroundDuration = 0;
-        }
-    });
+        });
+    }
 })(LCHago || (LCHago = {}));
 var LCHago;
 (function (LCHago) {
@@ -103,123 +88,98 @@ var LCHago;
     var msgPong = new gameProto.Msg();
     msgPong.ID = gameProto.MsgID.Pong;
     var pongBytes = gameProto.Msg.encode(msgPing).finish();
-    setTimeout(function () {
-        if (isCreate == false) {
-            LCHago.ResultNoStart();
-        }
-    }, 10000);
-    var isCreate = false;
-    var isSurrender = false;
-    var WSServer = (function () {
-        function WSServer() {
-            this.isClose = false;
-            this.isSendReady = false;
-            this.isSendResult = false;
-            this.hasRecvResult = false;
-            this.pingDuration = 0;
-            this.timeoutDuration = 0;
-            this.closeDuration = 0;
+    var WebsocketClientStatus;
+    (function (WebsocketClientStatus) {
+        WebsocketClientStatus[WebsocketClientStatus["CLOSED"] = 0] = "CLOSED";
+        WebsocketClientStatus[WebsocketClientStatus["CLOSING"] = 1] = "CLOSING";
+        WebsocketClientStatus[WebsocketClientStatus["CONNECTING"] = 2] = "CONNECTING";
+        WebsocketClientStatus[WebsocketClientStatus["OPEN"] = 3] = "OPEN";
+    })(WebsocketClientStatus = LCHago.WebsocketClientStatus || (LCHago.WebsocketClientStatus = {}));
+    var WebsocketClient = (function () {
+        function WebsocketClient() {
             this.sendIndex = 0;
             this.sendHistory = [];
             this.recvIndex = 0;
+            this.pingInterval = 3;
+            this.timeoutInterval = 6;
+            this.closeInterval = 10;
+            this.pingDuration = 0;
+            this.timeoutDuration = 0;
+            this.closeDuration = 0;
+            this.isEnd = false;
+            this.isSendReady = false;
+            this.isSendResult = false;
+            this.isCreate = false;
+            this.isSurrender = false;
+            this.isStart = false;
         }
-        WSServer.prototype.connect = function () {
-            if (this.ws || this.isClose) {
+        WebsocketClient.prototype.connect = function (url) {
+            if (this.conn != null) {
                 return;
             }
-            this.isClose = false;
-            console.log("正在连接服务器", LCHago.Config.wsUrl);
+            this.url = url;
+            this.status = WebsocketClientStatus.CONNECTING;
+            this.startInterval();
+            var conn = new WebSocket(url);
             var self = this;
-            if (self.closeInterval == null) {
-                self.closeInterval = setInterval(function () {
-                    self.closeDuration += 1;
-                    if (self.closeDuration >= LCHago.Config.closeSpace) {
-                        console.log("timeout");
-                        self.closeDuration -= LCHago.Config.closeSpace;
-                        self.close();
-                    }
-                }, 1000);
-            }
-            var ws = this.ws = new WebSocket(LCHago.Config.wsUrl);
-            ws.onopen = this.onOpen.bind(this);
-            ws.onmessage = this.onMessage.bind(this);
-            ws.onclose = this.onClose.bind(this);
-        };
-        WSServer.prototype.onOpen = function () {
-            var self = this;
-            self.resetDuration();
-            if (self.pingInterval == null) {
-                self.pingInterval = setInterval(function () {
-                    self.pingDuration += 0.5;
-                    if (self.pingDuration >= LCHago.Config.pingSpace) {
-                        self.pingDuration -= LCHago.Config.pingSpace;
-                        self.ping();
-                    }
-                }, 500);
-            }
-            if (self.timeoutInterval == null) {
-                self.timeoutInterval = setInterval(function () {
-                    self.timeoutDuration += 0.5;
-                    if (self.timeoutDuration >= LCHago.Config.timeoutSpace) {
-                        console.log("disconnect");
-                        self.timeoutDuration -= LCHago.Config.timeoutSpace;
-                        self.disconnect();
-                    }
-                }, 500);
-            }
-            self.ws.binaryType = 'arraybuffer';
-            if (this.joinID == null) {
-                LCHago.onWSConnect();
-                this.join();
-            }
-            else {
-                LCHago.onWSReconnect();
-                this.rejoin();
-                this.recvErr();
-            }
-        };
-        WSServer.prototype.onMessage = function (evt) {
-            try {
+            conn.onopen = function () {
+                conn.binaryType = 'arraybuffer';
+                self.status = WebsocketClientStatus.OPEN;
+                self.resetDuration();
+                if (self.onOpen) {
+                    self.onOpen();
+                }
+            };
+            conn.onmessage = function (evt) {
+                self.resetDuration();
                 var uint8array = new Uint8Array(evt.data);
                 var msg = gameProto.Msg.decode(uint8array);
                 switch (msg.ID) {
                     case gameProto.MsgID.Ping:
-                        this.pong();
+                        self.pong();
                         break;
                     case gameProto.MsgID.JoinResp:
                         var msgJoinResp = gameProto.MsgJoinResp.decode(uint8array);
-                        this.joinID = msgJoinResp.joinID;
+                        self.joinID = msgJoinResp.joinID;
                         LCHago.onJoin();
                         break;
                     case gameProto.MsgID.Create:
+                        self.isCreate = true;
                         var msgCreate = gameProto.MsgCreate.decode(uint8array);
-                        this.recvMsg(msgCreate.index);
+                        self.recvMsg(msgCreate.index);
                         LCHago.onCreate(msgCreate);
+                        if (LCHago.isHago) {
+                            hago.onPKStart();
+                            hago.setGameExitCallback(function () {
+                                LCHago.ResultLose();
+                            });
+                        }
                         break;
                     case gameProto.MsgID.Start:
                         var msgStart = gameProto.MsgStart.decode(uint8array);
-                        this.recvMsg(msgStart.index);
+                        self.recvMsg(msgStart.index);
                         LCHago.onStart(msgStart);
+                        self.isStart = true;
                         break;
                     case gameProto.MsgID.Custom:
                         var msgCustom = gameProto.MsgCustom.decode(uint8array);
                         LCHago.onCustom(msgCustom.data);
-                        this.recvMsg(msgCustom.index);
+                        self.recvMsg(msgCustom.index);
                         break;
                     case gameProto.MsgID.Error:
                         var msgError = gameProto.MsgError.decode(uint8array);
-                        LCHago.onError(msgError.msg);
-                        this.close();
+                        self.close();
                         break;
                     case gameProto.MsgID.SendError:
                         var msgSendError = gameProto.MsgSendError.decode(uint8array);
-                        this.onSendError(msgSendError.from);
-                        console.log("msgSendError", msgSendError);
+                        self.onSendError(msgSendError.from);
                         break;
                     case gameProto.MsgID.End:
                         var msgEnd = gameProto.MsgEnd.decode(uint8array);
+                        self.isEnd = true;
                         if (msgEnd.type == 0) {
                             LCHago.onNoStart();
+                            self.isSurrender = true;
                         }
                         if (msgEnd.type == 1) {
                             LCHago.onEndWin();
@@ -230,101 +190,132 @@ var LCHago;
                         else {
                             LCHago.onEndDraw();
                         }
-                        this.hasRecvResult = true;
+                        var result_1 = {
+                            timestamp: msgEnd.timestamp,
+                            nonstr: msgEnd.nonstr,
+                            sign: msgEnd.sign,
+                            resultrawdata: msgEnd.resultrawdata,
+                            result: JSON.parse(msgEnd.resultrawdata)
+                        };
+                        if (LCHago.isHago) {
+                            setTimeout(function () {
+                                hago.onPKFinish(JSON.stringify(result_1));
+                            }, 3000);
+                        }
+                        self.close();
                         break;
                 }
-            }
-            catch (error) {
-                console.log(error);
-            }
-            this.resetDuration();
+            };
+            this.conn = conn;
         };
-        WSServer.prototype.resetDuration = function () {
+        WebsocketClient.prototype.startInterval = function () {
+            if (this.intervalNumber != null) {
+                return;
+            }
+            var self = this;
+            this.intervalNumber = setInterval(function () {
+                ++self.pingDuration;
+                ++self.timeoutDuration;
+                ++self.closeDuration;
+                if (self.pingDuration >= self.pingInterval) {
+                    self.pingDuration -= self.pingInterval;
+                    self.ping();
+                }
+                if (self.timeoutDuration >= self.timeoutInterval) {
+                    self.timeoutDuration -= self.timeoutInterval;
+                    self.reconnect();
+                }
+                if (self.closeDuration >= self.closeInterval) {
+                    self.closeDuration -= self.closeInterval;
+                    self.close();
+                }
+            }, 1000);
+        };
+        WebsocketClient.prototype.reconnect = function () {
+            if (this.status <= WebsocketClientStatus.CLOSING) {
+                return;
+            }
+            this.status = WebsocketClientStatus.CLOSING;
+            if (this.conn) {
+                this.conn.close();
+                this.conn = null;
+            }
+            if (this.onReconnect) {
+                this.onReconnect();
+            }
+            this.pingDuration = 0;
+            this.timeoutDuration = 0;
+            var self = this;
+            setTimeout(function () {
+                if (self.status == WebsocketClientStatus.CLOSING) {
+                    self.connect(self.url);
+                }
+            }, 1000);
+        };
+        WebsocketClient.prototype.resetDuration = function () {
             this.pingDuration = 0;
             this.timeoutDuration = 0;
             this.closeDuration = 0;
         };
-        WSServer.prototype.onClose = function () {
-            this.ws = null;
-            this.disconnect();
-        };
-        WSServer.prototype.saveSend = function (bytes) {
+        WebsocketClient.prototype.saveSend = function (bytes) {
             this.sendIndex += 1;
             this.sendHistory.push(bytes);
         };
-        WSServer.prototype.recvMsg = function (index) {
+        WebsocketClient.prototype.recvMsg = function (index) {
             if (index == this.recvIndex) {
-                console.log("recvMsg", index, "顺序正确");
                 this.recvIndex += 1;
             }
             else {
-                console.log("recvMsg", index, "顺序错误", this.recvIndex);
             }
         };
-        WSServer.prototype.ping = function () {
+        WebsocketClient.prototype.ping = function () {
+            if (LCHago.isEnterBackground) {
+                return;
+            }
             this.send(pingBytes);
         };
-        WSServer.prototype.pong = function () {
+        WebsocketClient.prototype.pong = function () {
+            if (LCHago.isEnterBackground) {
+                return;
+            }
             this.send(pongBytes);
         };
-        WSServer.prototype.send = function (msg) {
-            if (this.ws && this.ws.readyState == 1) {
-                this.ws.send(msg);
+        WebsocketClient.prototype.send = function (msg) {
+            if (this.status == WebsocketClientStatus.OPEN) {
+                this.conn.send(msg);
+                return true;
             }
+            return false;
         };
-        WSServer.prototype.disconnect = function () {
-            var _this = this;
-            if (this.ws) {
-                this.ws.close();
-            }
-            else {
-                if (this.isClose == false) {
-                    LCHago.onWSDisconnect();
+        WebsocketClient.prototype.close = function () {
+            if (this.status != WebsocketClientStatus.CLOSED) {
+                this.status = WebsocketClientStatus.CLOSED;
+                if (this.intervalNumber) {
+                    clearInterval(this.intervalNumber);
+                    this.intervalNumber = null;
+                }
+                if (this.conn) {
+                    this.conn.close();
+                    this.conn = null;
+                }
+                if (this.isEnd == false) {
+                    LCHago.onEndLose();
                     setTimeout(function () {
-                        if (_this.isClose == false) {
-                            _this.connect();
-                        }
-                    }, 1000);
+                        hago.onPKFinish("");
+                    }, 3000);
                 }
             }
         };
-        WSServer.prototype.close = function () {
-            if (this.isClose) {
-                return;
-            }
-            this.isClose = true;
-            if (this.ws) {
-                this.ws.close();
-            }
-            if (this.pingInterval) {
-                clearInterval(this.pingInterval);
-                this.pingInterval = null;
-            }
-            if (this.timeoutInterval) {
-                clearInterval(this.timeoutInterval);
-                this.timeoutInterval = null;
-            }
-            if (this.closeInterval) {
-                clearInterval(this.closeInterval);
-                this.closeInterval = null;
-            }
-            if (this.hasRecvResult) {
-                LCHago.onWSClose();
-            }
-            else {
-                LCHago.onWSTimeout();
-            }
-        };
-        WSServer.prototype.join = function () {
+        WebsocketClient.prototype.join = function (userData, roomData) {
             var msg = new gameProto.MsgJoin({
                 ID: gameProto.MsgID.Join,
-                userData: LCHago.Config.userData,
-                roomData: LCHago.Config.roomData,
+                userData: userData,
+                roomData: roomData,
             });
             var msgBytes = gameProto.MsgJoin.encode(msg).finish();
             this.send(msgBytes);
         };
-        WSServer.prototype.rejoin = function () {
+        WebsocketClient.prototype.rejoin = function () {
             var msg = new gameProto.MsgRejoin({
                 ID: gameProto.MsgID.Rejoin,
                 joinID: this.joinID,
@@ -332,7 +323,7 @@ var LCHago;
             var msgBytes = gameProto.MsgRejoin.encode(msg).finish();
             this.send(msgBytes);
         };
-        WSServer.prototype.recvErr = function () {
+        WebsocketClient.prototype.recvErr = function () {
             var msg = new gameProto.MsgRecvError({
                 ID: gameProto.MsgID.RecvError,
                 from: this.recvIndex,
@@ -340,7 +331,7 @@ var LCHago;
             var msgBytes = gameProto.MsgRecvError.encode(msg).finish();
             this.send(msgBytes);
         };
-        WSServer.prototype.sendReady = function () {
+        WebsocketClient.prototype.sendReady = function () {
             if (!this.isSendReady) {
                 this.isSendReady = true;
                 var msg = new gameProto.MsgReady({
@@ -350,10 +341,9 @@ var LCHago;
                 var msgBytes = gameProto.MsgReady.encode(msg).finish();
                 this.saveSend(msgBytes);
                 this.send(msgBytes);
-                console.log("send Ready", "我方准备就绪");
             }
         };
-        WSServer.prototype.sendCustom = function (data) {
+        WebsocketClient.prototype.sendCustom = function (data) {
             var msg = new gameProto.MsgCustom({
                 ID: gameProto.MsgID.Custom,
                 index: this.sendIndex,
@@ -363,7 +353,7 @@ var LCHago;
             this.saveSend(msgBytes);
             this.send(msgBytes);
         };
-        WSServer.prototype.sendResult = function (type) {
+        WebsocketClient.prototype.sendResult = function (type) {
             if (!this.isSendResult) {
                 this.isSendResult = true;
                 var msg = new gameProto.MsgResult({
@@ -376,61 +366,183 @@ var LCHago;
                 this.send(msgBytes);
             }
         };
-        WSServer.prototype.onSendError = function (from) {
+        WebsocketClient.prototype.onSendError = function (from) {
             for (var i = from, len = this.sendIndex; i < len; ++i) {
                 this.send(this.sendHistory[i]);
             }
         };
-        return WSServer;
+        return WebsocketClient;
     }());
-    LCHago.WSServer = WSServer;
+    LCHago.WebsocketClient = WebsocketClient;
 })(LCHago || (LCHago = {}));
 var LCHago;
 (function (LCHago) {
-    var wsServer = new LCHago.WSServer();
+    LCHago.testRobot = false;
+    var url = "ws://127.0.0.1:8888";
+    var userData = {
+        uid: "uid",
+        name: "name",
+        avatar: "avatar",
+        opt: "",
+    };
+    var roomData = {
+        roomID: "roomID",
+        gameID: "gameID",
+        channelID: "channelID",
+        kv: "",
+    };
+    var wsClient = new LCHago.WebsocketClient();
+    wsClient.onOpen = function () {
+        LCHago.onWSOpen();
+        if (wsClient.joinID == null) {
+            if (LCHago.isHago == false && LCHago.testRobot == true) {
+                userData.opt = JSON.stringify({
+                    ai_info: {
+                        uid: "robotuid",
+                        nick: "robotnick"
+                    }
+                });
+            }
+            wsClient.join(userData, roomData);
+        }
+        else {
+            wsClient.rejoin();
+            wsClient.recvErr();
+        }
+    };
+    wsClient.onReconnect = function () {
+        LCHago.onWSReconnect();
+    };
+    if (LCHago.isHago) {
+        hago.setGameExitCallback(function () {
+            hago.onGameExit();
+        });
+        hago.onPKLoading();
+        setTimeout(function () {
+            if (wsClient.isCreate == false) {
+                ResultNoStart();
+            }
+        }, 10000);
+        function getURL(wsscheme, wsDomain, port, gameid, roomid, postData, timestamp, nonstr, sign) {
+            var url = wsscheme +
+                "://" +
+                wsDomain +
+                ":" +
+                port +
+                "/" +
+                gameid +
+                "/" +
+                roomid +
+                "?post_data=" +
+                encodeURIComponent(postData) +
+                "&timestamp=" +
+                timestamp + "&nonstr=" + nonstr + "&sign=" + sign;
+            return url;
+        }
+        var getQueryString = function (name) {
+            var reg = new RegExp("(^|&)" + name + "=([^&]*)(&|$)", "i");
+            var r = window.location.search.substr(1).match(reg);
+            if (r != null)
+                return decodeURIComponent(r[2]);
+            return null;
+        };
+        var wsscheme_1 = getQueryString("wsscheme");
+        var wsDomain_1 = getQueryString("websocketdomain");
+        var port_1 = getQueryString("port");
+        var postData_1 = getQueryString("post_data");
+        var timestamp_1 = getQueryString("timestamp");
+        var nonstr_1 = getQueryString("nonstr");
+        var sign_1 = getQueryString("sign");
+        var pd = JSON.parse(postData_1);
+        var gameid_1 = pd.gameid;
+        var roomid_1 = pd.roomid;
+        function getPlayerURL() {
+            return getURL(wsscheme_1, wsDomain_1, port_1, gameid_1, roomid_1, postData_1, timestamp_1, nonstr_1, sign_1);
+        }
+        url = getPlayerURL();
+        userData = {
+            uid: pd.player.uid,
+            name: pd.player.name,
+            avatar: pd.player.avatar,
+            opt: pd.player.opt,
+        };
+        roomData = {
+            roomID: pd.roomid,
+            gameID: pd.gameid,
+            channelID: pd.channelid,
+            kv: getQueryString("kv_url"),
+        };
+    }
     function Connect() {
-        wsServer.connect();
+        if (LCHago.isHago) {
+            hago.onPKFinishLoading();
+        }
+        wsClient.connect(url);
     }
     LCHago.Connect = Connect;
-    function Disconnect() {
-        wsServer.disconnect();
+    function reconnect() {
+        wsClient.reconnect();
     }
-    LCHago.Disconnect = Disconnect;
+    LCHago.reconnect = reconnect;
+    function Close() {
+        wsClient.close();
+    }
+    LCHago.Close = Close;
     function Ready() {
-        wsServer.sendReady();
+        wsClient.sendReady();
     }
     LCHago.Ready = Ready;
     function Custom(data) {
-        wsServer.sendCustom(data);
+        wsClient.sendCustom(data);
     }
     LCHago.Custom = Custom;
     function ResultNoStart() {
-        wsServer.sendResult(0);
+        wsClient.sendResult(0);
     }
     LCHago.ResultNoStart = ResultNoStart;
     function ResultWin() {
-        wsServer.sendResult(1);
+        wsClient.sendResult(1);
     }
     LCHago.ResultWin = ResultWin;
     function ResultLose() {
-        wsServer.sendResult(2);
+        wsClient.sendResult(2);
     }
     LCHago.ResultLose = ResultLose;
     function ResultDraw() {
-        wsServer.sendResult(3);
+        wsClient.sendResult(3);
     }
     LCHago.ResultDraw = ResultDraw;
     function GetDeviceInfo(cb) {
-        setTimeout(function () {
+        if (LCHago.isHago) {
+            hago.getDeviceInfo({
+                success: function (deviceInfo) {
+                    if (deviceInfo.lang == "in_ID") {
+                        deviceInfo.lang = "id";
+                    }
+                    else if (deviceInfo.lang == "hi_IN") {
+                        deviceInfo.lang = "in";
+                    }
+                    cb(deviceInfo);
+                },
+                failure: function () {
+                }
+            });
+        }
+        else {
             cb({
-                safeAreaInser: { top: 0, left: 0, bottom: 0, right: 0 },
+                safeAreaInser: {
+                    top: 0,
+                    left: 0,
+                    bottom: 0,
+                    right: 0
+                },
                 lang: "en",
                 screenSize: {
                     width: document.body.clientWidth,
-                    height: document.body.clientHeight,
+                    height: document.body.clientHeight
                 }
             });
-        }, 100);
+        }
     }
     LCHago.GetDeviceInfo = GetDeviceInfo;
 })(LCHago || (LCHago = {}));
