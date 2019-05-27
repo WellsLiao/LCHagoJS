@@ -53,15 +53,6 @@ var LCHago;
         console.log("未监听onEnterForeground");
     };
     LCHago.isEnterBackground = false;
-    var backgroundDuration = 0;
-    setInterval(function () {
-        if (LCHago.isEnterBackground) {
-            backgroundDuration += 1;
-            if (backgroundDuration > 15) {
-                LCHago.ResultLose();
-            }
-        }
-    }, 1000);
     if (LCHago.isHago) {
         hago.setEnterBackgroundCallback(function () {
             console.error("setEnterBackgroundCallback");
@@ -76,7 +67,22 @@ var LCHago;
                 LCHago.onEnterForeground();
             }
             LCHago.isEnterBackground = false;
-            backgroundDuration = 0;
+        });
+    }
+    else {
+        document.addEventListener("visibilitychange", function (event) {
+            if (document.hidden == true) {
+                if (LCHago.onEnterBackground) {
+                    LCHago.onEnterBackground();
+                }
+                LCHago.isEnterBackground = true;
+            }
+            else {
+                if (LCHago.onEnterForeground) {
+                    LCHago.onEnterForeground();
+                }
+                LCHago.isEnterBackground = false;
+            }
         });
     }
 })(LCHago || (LCHago = {}));
@@ -88,6 +94,16 @@ var LCHago;
     var msgPong = new gameProto.Msg();
     msgPong.ID = gameProto.MsgID.Pong;
     var pongBytes = gameProto.Msg.encode(msgPing).finish();
+    var lastT = 0;
+    var currentTimestamp = 0;
+    var update = function (t) {
+        if (lastT != 0) {
+            currentTimestamp += t - lastT;
+        }
+        lastT = t;
+        requestAnimationFrame(update);
+    };
+    requestAnimationFrame(update);
     var WebsocketClientStatus;
     (function (WebsocketClientStatus) {
         WebsocketClientStatus[WebsocketClientStatus["CLOSED"] = 0] = "CLOSED";
@@ -142,6 +158,15 @@ var LCHago;
                         var msgJoinResp = gameProto.MsgJoinResp.decode(uint8array);
                         self.joinID = msgJoinResp.joinID;
                         LCHago.onJoin();
+                        var startT_1 = currentTimestamp;
+                        var number_1 = setInterval(function () {
+                            if (currentTimestamp - startT_1 >= 10000) {
+                                clearInterval(number_1);
+                                if (self.isCreate == false) {
+                                    LCHago.ResultNoStart();
+                                }
+                            }
+                        }, 500);
                         break;
                     case gameProto.MsgID.Create:
                         self.isCreate = true;
@@ -198,9 +223,13 @@ var LCHago;
                             result: JSON.parse(msgEnd.resultrawdata)
                         };
                         if (LCHago.isHago) {
-                            setTimeout(function () {
-                                hago.onPKFinish(JSON.stringify(result_1));
-                            }, 3000);
+                            var startT_2 = currentTimestamp;
+                            var number_2 = setInterval(function () {
+                                if (currentTimestamp - startT_2 >= 3000) {
+                                    clearInterval(number_2);
+                                    hago.onPKFinish(JSON.stringify(result_1));
+                                }
+                            }, 500);
                         }
                         self.close();
                         break;
@@ -213,23 +242,26 @@ var LCHago;
                 return;
             }
             var self = this;
+            var startT = currentTimestamp;
             this.intervalNumber = setInterval(function () {
-                ++self.pingDuration;
-                ++self.timeoutDuration;
-                ++self.closeDuration;
-                if (self.pingDuration >= self.pingInterval) {
-                    self.pingDuration -= self.pingInterval;
-                    self.ping();
+                var delta = (currentTimestamp - startT) / 1000;
+                self.pingDuration += delta;
+                self.timeoutDuration += delta;
+                self.closeDuration += delta;
+                startT = currentTimestamp;
+                if (self.closeDuration >= self.closeInterval) {
+                    self.closeDuration -= self.closeInterval;
+                    self.close();
                 }
                 if (self.timeoutDuration >= self.timeoutInterval) {
                     self.timeoutDuration -= self.timeoutInterval;
                     self.reconnect();
                 }
-                if (self.closeDuration >= self.closeInterval) {
-                    self.closeDuration -= self.closeInterval;
-                    self.close();
+                if (self.pingDuration >= self.pingInterval) {
+                    self.pingDuration -= self.pingInterval;
+                    self.ping();
                 }
-            }, 1000);
+            }, 500);
         };
         WebsocketClient.prototype.reconnect = function () {
             if (this.status <= WebsocketClientStatus.CLOSING) {
@@ -300,9 +332,13 @@ var LCHago;
                 }
                 if (this.isEnd == false) {
                     LCHago.onEndLose();
-                    setTimeout(function () {
-                        hago.onPKFinish("");
-                    }, 3000);
+                    var startT_3 = currentTimestamp;
+                    var number_3 = setInterval(function () {
+                        if (currentTimestamp - startT_3 >= 3000) {
+                            clearInterval(number_3);
+                            hago.onPKFinish("");
+                        }
+                    }, 500);
                 }
             }
         };
@@ -378,7 +414,7 @@ var LCHago;
 var LCHago;
 (function (LCHago) {
     LCHago.testRobot = false;
-    var url = "ws://www.duligame.cn:8890";
+    var url = "wss://www.duligame.cn:8890";
     var userData = {
         uid: "uid",
         name: "name",
@@ -418,11 +454,6 @@ var LCHago;
             hago.onGameExit();
         });
         hago.onPKLoading();
-        setTimeout(function () {
-            if (wsClient.isCreate == false) {
-                ResultNoStart();
-            }
-        }, 10000);
         function getURL(wsscheme, wsDomain, port, gameid, roomid, postData, timestamp, nonstr, sign) {
             var url = wsscheme +
                 "://" +
