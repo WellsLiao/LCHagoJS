@@ -122,6 +122,7 @@ var LCHago;
             this.pingDuration = 0;
             this.timeoutDuration = 0;
             this.closeDuration = 0;
+            this.isConnected = false;
             this.isEnd = false;
             this.isSendReady = false;
             this.isSendResult = false;
@@ -137,6 +138,26 @@ var LCHago;
             this.status = WebsocketClientStatus.CONNECTING;
             this.startInterval();
             var conn = new WebSocket(url);
+            if (this.isConnected == false) {
+                this.isConnected = true;
+                var startT_1 = currentTimestamp;
+                var intervalNoStart_1 = setInterval(function () {
+                    if (currentTimestamp - startT_1 >= 8000) {
+                        clearInterval(intervalNoStart_1);
+                        if (self.isCreate == false) {
+                            LCHago.ResultNoStart();
+                        }
+                    }
+                }, 500);
+                var intervalError_1 = setInterval(function () {
+                    if (currentTimestamp - startT_1 >= 12000) {
+                        clearInterval(intervalError_1);
+                        if (self.isCreate == false) {
+                            hago.onPKExceptionFinish();
+                        }
+                    }
+                }, 500);
+            }
             var self = this;
             conn.onopen = function () {
                 conn.binaryType = 'arraybuffer';
@@ -158,15 +179,6 @@ var LCHago;
                         var msgJoinResp = gameProto.MsgJoinResp.decode(uint8array);
                         self.joinID = msgJoinResp.joinID;
                         LCHago.onJoin();
-                        var startT_1 = currentTimestamp;
-                        var number_1 = setInterval(function () {
-                            if (currentTimestamp - startT_1 >= 10000) {
-                                clearInterval(number_1);
-                                if (self.isCreate == false) {
-                                    LCHago.ResultNoStart();
-                                }
-                            }
-                        }, 500);
                         break;
                     case gameProto.MsgID.Create:
                         self.isCreate = true;
@@ -224,9 +236,9 @@ var LCHago;
                         };
                         if (LCHago.isHago) {
                             var startT_2 = currentTimestamp;
-                            var number_2 = setInterval(function () {
+                            var number_1 = setInterval(function () {
                                 if (currentTimestamp - startT_2 >= 3000) {
-                                    clearInterval(number_2);
+                                    clearInterval(number_1);
                                     hago.onPKFinish(JSON.stringify(result_1));
                                 }
                             }, 500);
@@ -333,9 +345,9 @@ var LCHago;
                 if (this.isEnd == false) {
                     LCHago.onEndLose();
                     var startT_3 = currentTimestamp;
-                    var number_3 = setInterval(function () {
+                    var number_2 = setInterval(function () {
                         if (currentTimestamp - startT_3 >= 3000) {
-                            clearInterval(number_3);
+                            clearInterval(number_2);
                             hago.onPKFinish("");
                         }
                     }, 500);
@@ -547,12 +559,6 @@ var LCHago;
         if (LCHago.isHago) {
             hago.getDeviceInfo({
                 success: function (deviceInfo) {
-                    if (deviceInfo.lang == "in_ID") {
-                        deviceInfo.lang = "id";
-                    }
-                    else if (deviceInfo.lang == "hi_IN") {
-                        deviceInfo.lang = "in";
-                    }
                     cb(deviceInfo);
                 },
                 failure: function () {
